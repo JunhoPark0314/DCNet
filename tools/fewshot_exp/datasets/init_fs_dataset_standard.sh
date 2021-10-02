@@ -1,8 +1,8 @@
 #!/bin/bash
 cd /workspace/data/pascal_voc
-cp voc_per_class.py /workspace/data/pascal_voc
+#cp voc_per_class.py /workspace/data/pascal_voc
 python voc_per_class.py
-wget http://pjreddie.com/media/files/voc_label.py
+#wget http://pjreddie.com/media/files/voc_label.py
 python voc_label.py
 cat 2007_train.txt 2007_val.txt 2012_*.txt > voc_train.txt
 

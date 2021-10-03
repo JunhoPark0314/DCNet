@@ -56,10 +56,10 @@ def visualize_episode(meta_input, meta_info, input, targets, results, writer, co
                         max_att = att_per_lvl.max(dim=1)[0].flatten(1,-1)
                         for k, per_cls_att in enumerate(max_att):
                                 storage.put_histogram("lvl{}_att/cls{}".format(j, k), per_cls_att)
-                        storage.put_scalar("att_max/lvl{}_mean".format(j), max_att.mean())
-                        storage.put_scalar("att_max/lvl{}_std".format(j), max_att.std())
-                        lvl_attn_ma[j] = storage.latest_with_smoothing_hint(20)["att_max/lvl{}_mean".format(j)][0]
-                        lvl_attn_mstd[j] = storage.latest_with_smoothing_hint(20)["att_max/lvl{}_std".format(j)][0]
+                        storage.put_scalar("att_max_mean/lvl{}".format(j), max_att.mean())
+                        storage.put_scalar("att_max_std/lvl{}".format(j), max_att.std())
+                        lvl_attn_ma[j] = storage.latest_with_smoothing_hint(20)["att_max_mean/lvl{}".format(j)][0]
+                        lvl_attn_mstd[j] = storage.latest_with_smoothing_hint(20)["att_max_std/lvl{}".format(j)][0]
 
                 for j, prop_mask in enumerate(per_trg_prop_mask):
                         lvl, h, w, = prop_mask.long()

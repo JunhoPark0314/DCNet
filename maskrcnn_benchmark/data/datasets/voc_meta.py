@@ -193,31 +193,35 @@ class PascalVOCDataset_Meta(torch.utils.data.Dataset):
                 for j in range(len(self.cls)):
                     metaid.append([j,self.metalines[j][i].rstrip()])
                 self.ids.append(metaid)
-            
+             
 
 
     def __getitem__(self, index):
         img_ids = self.ids[index]
         data = []
+        data_info = []
         for cls_id, img_id in img_ids:
-            
             img = cv2.imread(img_id, cv2.IMREAD_COLOR)
             img = img.astype(np.float32, copy=False)
+            origin_shape = img.shape
             
             img -= np.array([[[102.9801, 115.9465, 122.7717]]])
             height, width, _ = img.shape
             img = cv2.resize(img, (self.img_size, self.img_size), interpolation=cv2.INTER_LINEAR)
             #img = Image.open(img_id).convert("RGB")
-            mask = self.get_mask(img_id, cls_id, height, width)
+            mask, mask_info = self.get_mask(img_id, cls_id, height, width)
             img = torch.from_numpy(img).unsqueeze(0)
             mask = torch.from_numpy(mask).unsqueeze(0).unsqueeze(3)
             imgmask = torch.cat([img,mask],dim=3)
             imgmask = imgmask.permute(0, 3, 1, 2).contiguous()
             data.append(imgmask)
+            data_info.append({"mask_info":mask_info, "img_info": origin_shape})
         res = torch.cat(data,dim=0)
+        res = []
+        for d_i, dif_i in zip(data, data_info):
+            res.append((d_i, dif_i))
 
-        
-        return res
+        return res#, data_info
 
     def get_img_info(self, index):
         cls_id, img_id = self.ids[index][0]
@@ -234,6 +238,7 @@ class PascalVOCDataset_Meta(torch.utils.data.Dataset):
         mask = np.zeros((self.img_size, self.img_size), dtype=np.float32)
         y_ration = float(height) / self.img_size
         x_ration = float(width) / self.img_size
+        mask_info = []
 
         path = img_id.split('JPEG')[0]+'Annotations/'+img_id.split('/')[-1].split('.jpg')[0]+'.xml'
         target = ET.parse(path).getroot()
@@ -256,8 +261,9 @@ class PascalVOCDataset_Meta(torch.utils.data.Dataset):
                     cur_pt = int(cur_pt / y_ration)
                     bndbox.append(cur_pt)
             mask[bndbox[1]:bndbox[3], bndbox[0]:bndbox[2]] = 1
+            mask_info.append([bndbox, obj.find("name").text])
             break
-        return mask
+        return mask, mask_info
 
     def get_groundtruth(self, index):
         img_id = self.ids[index]

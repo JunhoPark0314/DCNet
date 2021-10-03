@@ -13,7 +13,7 @@ class BatchCollator(object):
     def __init__(self, size_divisible=0,meta=False):
         self.size_divisible = size_divisible
         self.meta = meta
-        
+         
     def __call__(self, batch):
         transposed_batch = list(zip(*batch))    
         if len(transposed_batch) == 3:
@@ -35,11 +35,25 @@ class BatchCollator(object):
 
             return images, targets, img_ids, origin
         if len(transposed_batch) == 15 or len(transposed_batch) == 60:
-            images = [torch.stack(image_per_level) for image_per_level in list(zip(*transposed_batch))]
-            return images
+            images = []
+            info = [] 
+            for per_img_batch in batch[0]:
+                images.append(per_img_batch[0])
+                info.append(per_img_batch[1])
+            images = torch.cat(images)
+
+            #images = [torch.stack(image_per_level) for image_per_level in list(zip(*transposed_batch))]
+            return images, info
         if len(transposed_batch) == 20 or len(transposed_batch) == 80:
-            images = [torch.stack(image_per_level) for image_per_level in list(zip(*transposed_batch))]
-            return images
+            images = []
+            info = [] 
+            for per_img_batch in batch[0]:
+                images.append(per_img_batch[0])
+                info.append(per_img_batch[1])
+            images = torch.cat(images)
+
+            #images = [torch.stack(image_per_level) for image_per_level in list(zip(*transposed_batch))]
+            return images, info
         else:
             images = [torch.stack(image_per_level) for image_per_level in list(zip(*transposed_batch[0]))]
             targets = torch.cat(transposed_batch[1])

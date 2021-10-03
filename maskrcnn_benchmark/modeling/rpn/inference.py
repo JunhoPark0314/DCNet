@@ -84,7 +84,9 @@ class RPNPostProcessor(torch.nn.Module):
         N, A, H, W = objectness.shape
 
         # put in the same format as anchors
+        box_mask = torch.zeros_like(objectness)
         objectness = permute_and_flatten(objectness, N, A, 1, H, W).view(N, -1)
+        box_mask = permute_and_flatten(box_mask, N, A, 1, H, W).view(N, -1)
         objectness = objectness.sigmoid()
 
         box_regression = permute_and_flatten(box_regression, N, A, 4, H, W)
@@ -108,19 +110,22 @@ class RPNPostProcessor(torch.nn.Module):
         proposals = proposals.view(N, -1, 4)
 
         result = []
-        for proposal, score, im_shape in zip(proposals, objectness, image_shapes):
+        box_mask_idx = []
+        for proposal, score, im_shape, bm, tk_idx in zip(proposals, objectness, image_shapes, box_mask,topk_idx):
             boxlist = BoxList(proposal, im_shape, mode="xyxy")
             boxlist.add_field("objectness", score)
             boxlist = boxlist.clip_to_image(remove_empty=False)
-            boxlist = remove_small_boxes(boxlist, self.min_size)
-            boxlist = boxlist_nms(
+            boxlist, keep_small = remove_small_boxes(boxlist, self.min_size)
+            boxlist, keep_nms = boxlist_nms(
                 boxlist,
                 self.nms_thresh,
                 max_proposals=self.post_nms_top_n,
                 score_field="objectness",
             )
+            bm[tk_idx[keep_small][keep_nms]] = 1
             result.append(boxlist)
-        return result
+            box_mask_idx.append(bm.reshape(H, W, A).nonzero())
+        return result, box_mask_idx
 
     def forward(self, anchors, objectness, box_regression, targets=None):
         """
@@ -134,24 +139,30 @@ class RPNPostProcessor(torch.nn.Module):
                 applying box decoding and NMS
         """
         sampled_boxes = []
+        sampled_box_mask = []
         num_levels = len(objectness)
         anchors = list(zip(*anchors))
-        for a, o, b in zip(anchors, objectness, box_regression):
-            sampled_boxes.append(self.forward_for_single_feature_map(a, o, b))
+        for i, (a, o, b) in enumerate(zip(anchors, objectness, box_regression)):
+            box_list, box_mask = self.forward_for_single_feature_map(a, o, b)
+            sampled_boxes.append(box_list)
+            box_mask = [torch.cat([torch.ones((len(x),1), device=x.device)*i, x],dim=-1) for x in box_mask]
+            sampled_box_mask.append(box_mask)
 
         boxlists = list(zip(*sampled_boxes))
+        sampled_box_mask = list(zip(*sampled_box_mask))
         boxlists = [cat_boxlist(boxlist) for boxlist in boxlists]
+        sampled_box_mask = [torch.cat(box_mask,dim=0) for box_mask in sampled_box_mask]
 
         if num_levels > 1:
-            boxlists = self.select_over_all_levels(boxlists)
+            boxlists, sampled_box_mask = self.select_over_all_levels(boxlists, sampled_box_mask)
 
         # append ground-truth bboxes to proposals
         if self.training and targets is not None:
             boxlists = self.add_gt_proposals(boxlists, targets)
 
-        return boxlists
+        return boxlists, sampled_box_mask
 
-    def select_over_all_levels(self, boxlists):
+    def select_over_all_levels(self, boxlists, box_mask_lists):
         num_images = len(boxlists)
         # different behavior during training and during testing:
         # during training, post_nms_top_n is over *all* the proposals combined, while
@@ -170,6 +181,7 @@ class RPNPostProcessor(torch.nn.Module):
             inds_mask = inds_mask.split(box_sizes)
             for i in range(num_images):
                 boxlists[i] = boxlists[i][inds_mask[i]]
+                box_mask_lists[i] = box_mask_lists[i][inds_mask[i]]
         else:
             for i in range(num_images):
                 objectness = boxlists[i].get_field("objectness")
@@ -178,7 +190,8 @@ class RPNPostProcessor(torch.nn.Module):
                     objectness, post_nms_top_n, dim=0, sorted=True
                 )
                 boxlists[i] = boxlists[i][inds_sorted]
-        return boxlists
+                box_mask_lists[i] = boxlists[i][inds_sorted]
+        return boxlists, box_mask_lists
 
 
 def make_rpn_postprocessor(config, rpn_box_coder, is_train):

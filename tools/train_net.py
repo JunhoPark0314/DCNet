@@ -6,6 +6,8 @@ Basic training script for PyTorch
 # Set up custom environment before nearly anything else is imported
 # NOTE: this should be the first import (no not reorder)
 from maskrcnn_benchmark.utils.env import setup_environment  # noqa F401 isort:skip
+from maskrcnn_benchmark.utils.events import EventStorage
+from maskrcnn_benchmark.utils.events import TensorboardXWriter
 
 import argparse
 import os
@@ -82,6 +84,7 @@ def train(cfg, local_rank, distributed, phase, shot, split):
         meta=True
     )
     checkpoint_period = cfg.SOLVER.CHECKPOINT_PERIOD
+    writer = TensorboardXWriter(log_dir=cfg.OUTPUT_DIR)
     do_train(
         model,
         data_loader,
@@ -94,7 +97,8 @@ def train(cfg, local_rank, distributed, phase, shot, split):
         phase,
         shot,
         split,
-        arguments
+        arguments,
+        writer=writer
     )
 
     return model

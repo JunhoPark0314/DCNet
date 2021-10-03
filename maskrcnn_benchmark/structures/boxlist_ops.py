@@ -28,7 +28,7 @@ def boxlist_nms(boxlist, nms_thresh, max_proposals=-1, score_field="scores"):
     if max_proposals > 0:
         keep = keep[: max_proposals]
     boxlist = boxlist[keep]
-    return boxlist.convert(mode)
+    return boxlist.convert(mode), keep
 
 
 def remove_small_boxes(boxlist, min_size):
@@ -45,7 +45,7 @@ def remove_small_boxes(boxlist, min_size):
     keep = (
         (ws >= min_size) & (hs >= min_size)
     ).nonzero().squeeze(1)
-    return boxlist[keep]
+    return boxlist[keep], keep
 
 
 # implementation from https://github.com/kuangliu/torchcv/blob/master/torchcv/utils/box.py

@@ -117,9 +117,9 @@ class GeneralizedRCNN(nn.Module):
         features = self.backbone((images.tensors,0))
         
         if self.dense_relation:
-            features = self.drd_opt(features, attentions)
+            features, full_attention = self.drd_opt(features, attentions)
 
-        proposals, proposal_losses = self.rpn(images, features, targets)
+        proposals, proposal_losses, prop_logs = self.rpn(images, features, targets)
        
         if self.roi_heads:    
             x, result, detector_losses = self.roi_heads(features, proposals, targets)
@@ -130,9 +130,15 @@ class GeneralizedRCNN(nn.Module):
             detector_losses = {}
         torch.cuda.empty_cache()
         if self.training:
+            detection_result = {
+                "proposal": proposals,
+                "roi": result,
+                "attention": full_attention,
+                "prop_logs": prop_logs
+            }
             losses = {}
             losses.update(detector_losses)
             losses.update(proposal_losses)
-            return losses
+            return losses, detection_result
         
         return result

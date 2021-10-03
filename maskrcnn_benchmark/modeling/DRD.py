@@ -1,7 +1,8 @@
+from collections import defaultdict
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
-
+ 
 class DenseRelationDistill(nn.Module):
 
     def __init__(self, indim, keydim, valdim, dense_sum=False):
@@ -39,6 +40,7 @@ class DenseRelationDistill(nn.Module):
                     atten = torch.cat((atten,attentions[i].unsqueeze(0)),dim=0)
             attentions = atten.cuda()
         output = []
+        full_attention = defaultdict(list)
         h , w = attentions.shape[2:]
         ncls = attentions.shape[0]       
         key_t = self.key_t(attentions)   
@@ -56,6 +58,7 @@ class DenseRelationDistill(nn.Module):
        
                 p = torch.matmul(kq,key_t.view(ncls,32,-1))   
                 p = F.softmax(p,dim=1)
+                full_attention[i].append(F.interpolate(p.permute(0,2,1).view(ncls, 256, h, w), size=(H,W), mode='bilinear', align_corners=True))
 
                 val_t_out = torch.matmul(val_t.view(ncls,128,-1),p).view(ncls,128,h,w)  
                 for j in range(ncls):
@@ -79,4 +82,4 @@ class DenseRelationDistill(nn.Module):
                 output[i] = self.combine(torch.cat((features[i],output[i]),dim=1))
         output = tuple(output)
         
-        return output
+        return output, full_attention

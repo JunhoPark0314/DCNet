@@ -190,7 +190,7 @@ class RPNModule(torch.nn.Module):
             # For end-to-end models, anchors must be transformed into boxes and
             # sampled into a training batch.
             with torch.no_grad():
-                boxes = self.box_selector_train(
+                boxes, box_mask = self.box_selector_train(
                     anchors, objectness, rpn_box_regression, targets
                 )
         loss_objectness, loss_rpn_box_reg = self.loss_evaluator(
@@ -200,10 +200,13 @@ class RPNModule(torch.nn.Module):
             "loss_objectness": loss_objectness,
             "loss_rpn_box_reg": loss_rpn_box_reg,
         }
-        return boxes, losses
+        logs = {
+            "box_mask": box_mask
+        }
+        return boxes, losses, logs
 
     def _forward_test(self, anchors, objectness, rpn_box_regression):
-        boxes = self.box_selector_test(anchors, objectness, rpn_box_regression)
+        boxes, box_mask = self.box_selector_test(anchors, objectness, rpn_box_regression)
         if self.cfg.MODEL.RPN_ONLY:
             # For end-to-end models, the RPN proposals are an intermediate state
             # and don't bother to sort them in decreasing score order. For RPN-only
@@ -213,7 +216,10 @@ class RPNModule(torch.nn.Module):
                 box.get_field("objectness").sort(descending=True)[1] for box in boxes
             ]
             boxes = [box[ind] for box, ind in zip(boxes, inds)]
-        return boxes, {}
+        logs = {
+            "box_mask": box_mask
+        }
+        return boxes, {}, logs 
 
 
 def build_rpn(cfg, in_channels):

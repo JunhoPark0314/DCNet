@@ -3,3 +3,4 @@
 _C*
 __pycache__
 *egg-info*
+*.pkl

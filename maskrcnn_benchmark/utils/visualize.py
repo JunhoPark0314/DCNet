@@ -24,9 +24,20 @@ def visualize_episode(meta_input, meta_info, input, targets, results, writer, co
                 storage.put_image("meta_input/{}".format(i), scale_f(resized_img, 0.4))
         
         for i, (per_trg_gt, per_trg_prop, per_trg_roi, per_trg_prop_mask) in enumerate(zip(targets, results["proposal"], results["roi"], results["prop_logs"]["box_mask"])):
-                per_trg_prop = per_trg_prop[:20]
-                per_trg_roi = per_trg_roi[:20]
-                per_trg_prop_mask = per_trg_prop_mask[:5][...,:3]
+                # detach gt proposal
+                per_trg_prop = per_trg_prop[:-1]
+
+                per_trg_prop_mask = per_trg_prop_mask[per_trg_prop.extra_fields['labels'] != 0][...,:3]
+                per_trg_prop = per_trg_prop[per_trg_prop.extra_fields['labels'] != 0]
+                per_trg_roi = per_trg_roi[per_trg_roi.extra_fields['labels'] != 0]
+
+                prop_idx = torch.randperm(len(per_trg_prop))[:5]
+                roi_idx = torch.randperm(len(per_trg_roi))[:5]
+
+                per_trg_prop = per_trg_prop[prop_idx]
+                per_trg_roi = per_trg_roi[roi_idx]
+                per_trg_prop_mask = per_trg_prop_mask[prop_idx]
+
                 gt_overlay = copy.deepcopy(input_image[i])
                 prop_overlay = copy.deepcopy(input_image[i])
                 roi_overlay = copy.deepcopy(input_image[i])

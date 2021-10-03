@@ -25,7 +25,7 @@ def visualize_episode(meta_input, meta_info, input, targets, results, writer, co
         
         for i, (per_trg_gt, per_trg_prop, per_trg_roi, per_trg_prop_mask) in enumerate(zip(targets, results["proposal"], results["roi"], results["prop_logs"]["box_mask"])):
                 # detach gt proposal
-                per_trg_prop = per_trg_prop[:-1]
+                per_trg_prop = per_trg_prop[:len(per_trg_prop_mask)]
 
                 per_trg_prop_mask = per_trg_prop_mask[per_trg_prop.extra_fields['labels'] != 0][...,:3]
                 per_trg_prop = per_trg_prop[per_trg_prop.extra_fields['labels'] != 0]
@@ -68,6 +68,7 @@ def visualize_episode(meta_input, meta_info, input, targets, results, writer, co
 
                         for k, (meta_img, per_cls_info) in enumerate(zip(resized_meta_img, meta_info)):
                                 meta_att = interpolate(curr_prop_att[k].view(1,1,16,16), per_cls_info['img_info'][:2]).squeeze(0).cpu()
+                                meta_att = (meta_att + 0.5) / 1.5
 
                                 storage.put_image("proposal{}/attention/{}".format(j,k), scale_f(meta_img * meta_att, 0.4))
 

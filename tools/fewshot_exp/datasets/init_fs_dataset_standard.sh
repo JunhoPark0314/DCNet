@@ -21,4 +21,4 @@ cd ..
 #init base/novel sets for fewshot exps
 python tools/fewshot_exp/datasets/voc_create_base.py
 python tools/fewshot_exp/datasets/voc_create_standard.py 1 # for random seed 1
-mkdir fs_exp
+mkdir -p fs_exp

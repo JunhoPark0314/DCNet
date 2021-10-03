@@ -68,7 +68,7 @@ def do_train(
     
     data_iter_meta = iter(meta_loader)
     print('meta itered')
-    with EventStorage(start_iter=0):
+    with EventStorage(start_iter=start_iter):
         storage = get_event_storage()
         for iteration, (images, targets, _) in enumerate(data_loader, start_iter):
             data_time = time.time() - end
@@ -149,9 +149,23 @@ def do_train(
 
         with torch.no_grad():
             class_attentions = collections.defaultdict(list)
+            meta_loader.batch_sampler.start_iter = 0
+            data_loader.batch_sampler.start_iter = 0
+
+            data_iter = iter(data_loader)
             meta_iter1 = iter(meta_loader)
             for i in range(shot):
-                meta_input = next(meta_iter1)[0]
+                try:
+                    meta_input = next(meta_iter1)[0]
+                    images, targets, _ = next(data_iter)
+                except StopIteration:
+                    meta_iter1 = iter(meta_loader)
+                    meta_input = next(meta_iter1)[0]
+                    images, targets, _ = next(data_iter)
+
+
+                images = images.to(device)
+                meta_input = meta_input.to(device)
                 num_classes = meta_input.shape[0]
             
                 meta_label = []

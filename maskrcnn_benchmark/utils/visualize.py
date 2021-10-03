@@ -50,7 +50,6 @@ def visualize_episode(meta_input, meta_info, input, targets, results, writer, co
 		break
 
 	writer.write(storage)
-	print("break")
 
 def sample_result(per_trg_prop, per_trg_roi, per_trg_prop_mask, prop_mask, roi_mask):
 	trg_prop = per_trg_prop[prop_mask]

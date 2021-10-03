@@ -190,7 +190,7 @@ class RPNPostProcessor(torch.nn.Module):
                     objectness, post_nms_top_n, dim=0, sorted=True
                 )
                 boxlists[i] = boxlists[i][inds_sorted]
-                box_mask_lists[i] = boxlists[i][inds_sorted]
+                box_mask_lists[i] = box_mask_lists[i][inds_sorted]
         return boxlists, box_mask_lists
 
 

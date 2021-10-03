@@ -145,7 +145,7 @@ class RetinaNetPostProcessor(RPNPostProcessor):
                 boxes_j = boxes[inds, :].view(-1, 4)
                 boxlist_for_class = BoxList(boxes_j, boxlist.size, mode="xyxy")
                 boxlist_for_class.add_field("scores", scores_j)
-                boxlist_for_class = boxlist_nms(
+                boxlist_for_class, keep_nms = boxlist_nms(
                     boxlist_for_class, self.nms_thresh,
                     score_field="scores"
                 )

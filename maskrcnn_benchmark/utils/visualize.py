@@ -50,13 +50,16 @@ def visualize_episode(meta_input, meta_info, input, targets, results, writer, co
                 
                 curr_trg_attention = results["attention"][i]
                 lvl_attn_ma = torch.zeros(5, device=resized_meta_img[0].device)
+                lvl_attn_mstd = torch.zeros(5, device=resized_meta_img[0].device)
 
                 for j, att_per_lvl in enumerate(curr_trg_attention):
                         max_att = att_per_lvl.max(dim=1)[0].flatten(1,-1)
                         for k, per_cls_att in enumerate(max_att):
                                 storage.put_histogram("cls{}/lvl{}_att".format(k, j), per_cls_att)
-                        storage.put_scalar("att_max/lvl{}".format(j), max_att.mean())
-                        lvl_attn_ma[j] = storage.latest_with_smoothing_hint(20)["att_max/lvl{}".format(j)][0]
+                        storage.put_scalar("att_max/lvl{}_mean".format(j), max_att.mean())
+                        storage.put_scalar("att_max/lvl{}_std".format(j), max_att.std())
+                        lvl_attn_ma[j] = storage.latest_with_smoothing_hint(20)["att_max/lvl{}_mean".format(j)][0]
+                        lvl_attn_mstd[j] = storage.latest_with_smoothing_hint(20)["att_max/lvl{}_std".format(j)][0]
 
                 for j, prop_mask in enumerate(per_trg_prop_mask):
                         lvl, h, w, = prop_mask.long()
@@ -68,7 +71,7 @@ def visualize_episode(meta_input, meta_info, input, targets, results, writer, co
 
                         for k, (meta_img, per_cls_info) in enumerate(zip(resized_meta_img, meta_info)):
                                 meta_att = interpolate(curr_prop_att[k].view(1,1,16,16), per_cls_info['img_info'][:2]).squeeze(0).cpu()
-                                meta_att = (meta_att + 0.5) / 1.5
+                                meta_att = (((meta_att - lvl_attn_ma[j]) / lvl_attn_mstd[j]) * 5).sigmoid()
 
                                 storage.put_image("proposal{}/attention/{}".format(j,k), scale_f(meta_img * meta_att, 0.4))
 

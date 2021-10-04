@@ -13,8 +13,10 @@ class DenseRelationDistill(nn.Module):
 
         if no_padding:
             padding = 0
+            bn_dim = 196
         else:
             padding = (1,1)
+            bn_dim = 256
 
         self.key_t = nn.Conv2d(indim, keydim, kernel_size=(3,3), padding=padding, stride=1)
         self.value_t = nn.Conv2d(indim, valdim, kernel_size=(3,3), padding=padding, stride=1)
@@ -40,7 +42,7 @@ class DenseRelationDistill(nn.Module):
             self.combine = nn.Conv2d(512,256,kernel_size=1,padding=0,stride=1)
         
         if self.sigmoid_attn:
-            self.attn_bnn = nn.BatchNorm1d(256)
+            self.attn_bnn = nn.BatchNorm1d(bn_dim)
             self.temperature = 10
    
     def forward(self,features,attentions):
@@ -74,9 +76,12 @@ class DenseRelationDistill(nn.Module):
                 p = torch.matmul(kq,key_t.view(ncls,32,-1))   
 
                 if self.sigmoid_attn:
-                    storage = get_event_storage()
-                    curr_prog = (storage.max_iter - storage.iter * 2) / storage.max_iter
-                    temperature = max(self.temperature * curr_prog, 2)
+                    if self.training:
+                        storage = get_event_storage()
+                        curr_prog = (storage.max_iter - storage.iter * 2) / storage.max_iter
+                        temperature = max(self.temperature * curr_prog, 2)
+                    else:
+                        temperature = 2
                     p = (self.attn_bnn(p) / temperature).sigmoid()
                 else:
                     p = F.softmax(p,dim=1)

@@ -70,6 +70,7 @@ def do_train(
     print('meta itered')
     with EventStorage(start_iter=start_iter):
         storage = get_event_storage()
+        storage.max_iter = len(data_loader)
         for iteration, (images, targets, _) in enumerate(data_loader, start_iter):
             data_time = time.time() - end
             iteration = iteration + 1

@@ -2,16 +2,18 @@ from collections import defaultdict
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
+from maskrcnn_benchmark.utils.events import get_event_storage
  
 class DenseRelationDistill(nn.Module):
 
-    def __init__(self, indim, keydim, valdim, dense_sum=False):
+    def __init__(self, indim, keydim, valdim, dense_sum=False, sigmoid_attn=False):
         super(DenseRelationDistill,self).__init__()
         #self.key_q = nn.Conv2d(indim, keydim, kernel_size=(3,3), padding=(1,1), stride=1)
         #self.value_q = nn.Conv2d(indim, valdim, kernel_size=(3,3), padding=(1,1), stride=1)
         self.key_t = nn.Conv2d(indim, keydim, kernel_size=(3,3), padding=(1,1), stride=1)
         self.value_t = nn.Conv2d(indim, valdim, kernel_size=(3,3), padding=(1,1), stride=1)
         self.sum = dense_sum
+        self.sigmoid_attn = sigmoid_attn
         if self.sum:
             self.key_q0 = nn.Conv2d(indim, keydim, kernel_size=(3,3), padding=(1,1), stride=1)
             self.value_q0 = nn.Conv2d(indim, valdim, kernel_size=(3,3), padding=(1,1), stride=1)
@@ -29,6 +31,10 @@ class DenseRelationDistill(nn.Module):
             self.bnn3 = nn.BatchNorm2d(256)
             self.bnn4 = nn.BatchNorm2d(256)
             self.combine = nn.Conv2d(512,256,kernel_size=1,padding=0,stride=1)
+        
+        if self.sigmoid_attn:
+            self.attn_bnn = nn.BatchNorm1d(256)
+            self.temperature = 10
    
     def forward(self,features,attentions):
         features = list(features)
@@ -57,7 +63,15 @@ class DenseRelationDistill(nn.Module):
                 vq = val_q[i].unsqueeze(0)                  
        
                 p = torch.matmul(kq,key_t.view(ncls,32,-1))   
-                p = F.softmax(p,dim=1)
+
+                if self.sigmoid_attn:
+                    storage = get_event_storage()
+                    curr_prog = (storage.max_iter - storage.iter * 2) / storage.max_iter
+                    temperature = max(self.temperature * curr_prog, 2)
+                    p = (self.attn_bnn(p) / temperature).sigmoid()
+                else:
+                    p = F.softmax(p,dim=1)
+
                 full_attention[i].append(F.interpolate(p.permute(0,2,1).view(ncls, 256, h, w), size=(H,W), mode='bilinear', align_corners=True))
 
                 val_t_out = torch.matmul(val_t.view(ncls,128,-1),p).view(ncls,128,h,w)  

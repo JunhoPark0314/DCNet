@@ -67,13 +67,13 @@ def sample_result(per_trg_prop, per_trg_roi, per_trg_prop_mask, prop_mask, roi_m
 
 def attention_histogram(curr_trg_attention, lvl_attn_ma, lvl_attn_mstd, storage):
 	for j, att_per_lvl in enumerate(curr_trg_attention):
-		max_att = att_per_lvl.max(dim=1)[0].flatten(1,-1)
-		for k, per_cls_att in enumerate(max_att):
+		mean_att = att_per_lvl.mean(dim=1)[0].flatten(1,-1)
+		for k, per_cls_att in enumerate(mean_att):
 			storage.put_histogram("lvl{}_att/cls{}".format(j, k), per_cls_att * 256)
-		storage.put_scalar("att_max_mean/lvl{}".format(j), max_att.mean())
-		storage.put_scalar("att_max_std/lvl{}".format(j), max_att.std())
-		lvl_attn_ma[j] = storage.latest_with_smoothing_hint(20)["att_max_mean/lvl{}".format(j)][0]
-		lvl_attn_mstd[j] = storage.latest_with_smoothing_hint(20)["att_max_std/lvl{}".format(j)][0]
+		storage.put_scalar("att_mean_mean/lvl{}".format(j), mean_att.mean())
+		storage.put_scalar("att_mean_std/lvl{}".format(j), mean_att.std())
+		lvl_attn_ma[j] = storage.latest_with_smoothing_hint(20)["att_mean_mean/lvl{}".format(j)][0]
+		lvl_attn_mstd[j] = storage.latest_with_smoothing_hint(20)["att_mean_std/lvl{}".format(j)][0]
 
 def visualize_detection_result(input_image, per_trg_gt, per_trg_prop, per_trg_roi, img_idx, storage):
 	gt_overlay = copy.deepcopy(input_image)
@@ -98,12 +98,12 @@ def visualize_attention(per_trg_prop_mask, curr_trg_attention, input_image, per_
 
 		for k, (meta_img, per_cls_info) in enumerate(zip(resized_meta_img, meta_info)):
 			meta_att = interpolate(curr_prop_att[k].view(1,1,16,16), per_cls_info['img_info'][:2]).squeeze(0).cpu()
-			meta_att = (((meta_att - lvl_attn_ma[j]) / lvl_attn_mstd[j]) * 5).sigmoid()
+			meta_att = (((meta_att - lvl_attn_ma[j]) / lvl_attn_mstd[j])).sigmoid()
 
 			storage.put_image("{}_proposal_{}/attention/{}".format(tag,j,k), scale_f(meta_img * meta_att, 0.4))
 			meta_att_norm.append((meta_att ** 2).mean().sqrt())
-
-	storage.put_histogram("{}_att_norm".format(tag), torch.stack(meta_att_norm))
+	if len(meta_att_norm):
+		storage.put_histogram("{}_att_norm".format(tag), torch.stack(meta_att_norm))
 
 def compute_colors_for_labels(labels):
 	"""

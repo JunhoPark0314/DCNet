@@ -6,25 +6,34 @@ from maskrcnn_benchmark.utils.events import get_event_storage
  
 class DenseRelationDistill(nn.Module):
 
-    def __init__(self, indim, keydim, valdim, dense_sum=False, sigmoid_attn=False):
+    def __init__(self, indim, keydim, valdim, dense_sum=False, sigmoid_attn=False, no_padding=False):
         super(DenseRelationDistill,self).__init__()
         #self.key_q = nn.Conv2d(indim, keydim, kernel_size=(3,3), padding=(1,1), stride=1)
         #self.value_q = nn.Conv2d(indim, valdim, kernel_size=(3,3), padding=(1,1), stride=1)
-        self.key_t = nn.Conv2d(indim, keydim, kernel_size=(3,3), padding=(1,1), stride=1)
-        self.value_t = nn.Conv2d(indim, valdim, kernel_size=(3,3), padding=(1,1), stride=1)
+
+        if no_padding:
+            padding = 0
+            bn_dim = 196
+        else:
+            padding = (1,1)
+            bn_dim = 256
+
+        self.key_t = nn.Conv2d(indim, keydim, kernel_size=(3,3), padding=padding, stride=1)
+        self.value_t = nn.Conv2d(indim, valdim, kernel_size=(3,3), padding=padding, stride=1)
+
         self.sum = dense_sum
         self.sigmoid_attn = sigmoid_attn
         if self.sum:
-            self.key_q0 = nn.Conv2d(indim, keydim, kernel_size=(3,3), padding=(1,1), stride=1)
-            self.value_q0 = nn.Conv2d(indim, valdim, kernel_size=(3,3), padding=(1,1), stride=1)
-            self.key_q1 = nn.Conv2d(indim, keydim, kernel_size=(3,3), padding=(1,1), stride=1)
-            self.value_q1 = nn.Conv2d(indim, valdim, kernel_size=(3,3), padding=(1,1), stride=1)
-            self.key_q2 = nn.Conv2d(indim, keydim, kernel_size=(3,3), padding=(1,1), stride=1)
-            self.value_q2 = nn.Conv2d(indim, valdim, kernel_size=(3,3), padding=(1,1), stride=1)
-            self.key_q3 = nn.Conv2d(indim, keydim, kernel_size=(3,3), padding=(1,1), stride=1)
-            self.value_q3 = nn.Conv2d(indim, valdim, kernel_size=(3,3), padding=(1,1), stride=1)
-            self.key_q4 = nn.Conv2d(indim, keydim, kernel_size=(3,3), padding=(1,1), stride=1)
-            self.value_q4 = nn.Conv2d(indim, valdim, kernel_size=(3,3), padding=(1,1), stride=1)
+            self.key_q0 = nn.Conv2d(indim, keydim, kernel_size=(3,3), padding=padding, stride=1)
+            self.value_q0 = nn.Conv2d(indim, valdim, kernel_size=(3,3), padding=padding, stride=1)
+            self.key_q1 = nn.Conv2d(indim, keydim, kernel_size=(3,3), padding=padding, stride=1)
+            self.value_q1 = nn.Conv2d(indim, valdim, kernel_size=(3,3), padding=padding, stride=1)
+            self.key_q2 = nn.Conv2d(indim, keydim, kernel_size=(3,3), padding=padding, stride=1)
+            self.value_q2 = nn.Conv2d(indim, valdim, kernel_size=(3,3), padding=padding, stride=1)
+            self.key_q3 = nn.Conv2d(indim, keydim, kernel_size=(3,3), padding=padding, stride=1)
+            self.value_q3 = nn.Conv2d(indim, valdim, kernel_size=(3,3), padding=padding, stride=1)
+            self.key_q4 = nn.Conv2d(indim, keydim, kernel_size=(3,3), padding=padding, stride=1)
+            self.value_q4 = nn.Conv2d(indim, valdim, kernel_size=(3,3), padding=padding, stride=1)
             self.bnn0 = nn.BatchNorm2d(256)
             self.bnn1 = nn.BatchNorm2d(256)
             self.bnn2 = nn.BatchNorm2d(256)
@@ -33,7 +42,7 @@ class DenseRelationDistill(nn.Module):
             self.combine = nn.Conv2d(512,256,kernel_size=1,padding=0,stride=1)
         
         if self.sigmoid_attn:
-            self.attn_bnn = nn.BatchNorm1d(256)
+            self.attn_bnn = nn.BatchNorm1d(bn_dim)
             self.temperature = 10
    
     def forward(self,features,attentions):
@@ -51,6 +60,8 @@ class DenseRelationDistill(nn.Module):
         ncls = attentions.shape[0]       
         key_t = self.key_t(attentions)   
         val_t = self.value_t(attentions) 
+
+        att_h, att_w = val_t.shape[2:]
         for idx in range(len(features)):
             feature = features[idx]
             bs = feature.shape[0]       
@@ -65,16 +76,19 @@ class DenseRelationDistill(nn.Module):
                 p = torch.matmul(kq,key_t.view(ncls,32,-1))   
 
                 if self.sigmoid_attn:
-                    storage = get_event_storage()
-                    curr_prog = (storage.max_iter - storage.iter * 2) / storage.max_iter
-                    temperature = max(self.temperature * curr_prog, 2)
+                    if self.training:
+                        storage = get_event_storage()
+                        curr_prog = (storage.max_iter - storage.iter * 2) / storage.max_iter
+                        temperature = max(self.temperature * curr_prog, 2)
+                    else:
+                        temperature = 2
                     p = (self.attn_bnn(p) / temperature).sigmoid()
                 else:
                     p = F.softmax(p,dim=1)
+                
+                full_attention[i].append(F.interpolate(p.permute(0,2,1).view(ncls, att_h * att_w, att_h, att_w), size=(H,W), mode='bilinear', align_corners=True))
 
-                full_attention[i].append(F.interpolate(p.permute(0,2,1).view(ncls, 256, h, w), size=(H,W), mode='bilinear', align_corners=True))
-
-                val_t_out = torch.matmul(val_t.view(ncls,128,-1),p).view(ncls,128,h,w)  
+                val_t_out = torch.matmul(val_t.view(ncls,128,-1),p).view(ncls,128,att_h,att_w)  
                 for j in range(ncls):
                     if(j==0):
                         final_2 = torch.cat((vq,val_t_out[j].unsqueeze(0)),dim=1)

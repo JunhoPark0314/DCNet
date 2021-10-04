@@ -4,6 +4,7 @@ from maskrcnn_benchmark.utils.events import EventStorage, get_event_storage
 import copy
 import numpy as np
 from torch.nn.functional import interpolate
+from math import sqrt
 scale_f = lambda x,y : interpolate(x.unsqueeze(0), scale_factor=y).squeeze(0)
 
 def visualize_episode(meta_input, meta_info, input, targets, results, writer, coco=False):
@@ -68,12 +69,13 @@ def sample_result(per_trg_prop, per_trg_roi, per_trg_prop_mask, prop_mask, roi_m
 def attention_histogram(curr_trg_attention, lvl_attn_ma, lvl_attn_mstd, storage):
 	for j, att_per_lvl in enumerate(curr_trg_attention):
 		mean_att = att_per_lvl.mean(dim=1)[0].flatten(1,-1)
+		std_att = att_per_lvl.std(dim=1)[0].flatten(1, -1)
 		for k, per_cls_att in enumerate(mean_att):
 			storage.put_histogram("lvl{}_att/cls{}".format(j, k), per_cls_att * 256)
 		storage.put_scalar("att_mean_mean/lvl{}".format(j), mean_att.mean())
-		storage.put_scalar("att_mean_std/lvl{}".format(j), mean_att.std())
+		storage.put_scalar("att_std_mean/lvl{}".format(j), std_att.mean())
 		lvl_attn_ma[j] = storage.latest_with_smoothing_hint(20)["att_mean_mean/lvl{}".format(j)][0]
-		lvl_attn_mstd[j] = storage.latest_with_smoothing_hint(20)["att_mean_std/lvl{}".format(j)][0]
+		lvl_attn_mstd[j] = storage.latest_with_smoothing_hint(20)["att_std_mean/lvl{}".format(j)][0]
 
 def visualize_detection_result(input_image, per_trg_gt, per_trg_prop, per_trg_roi, img_idx, storage):
 	gt_overlay = copy.deepcopy(input_image)
@@ -88,16 +90,17 @@ def visualize_detection_result(input_image, per_trg_gt, per_trg_prop, per_trg_ro
 
 def visualize_attention(per_trg_prop_mask, curr_trg_attention, input_image, per_trg_prop, storage, lvl_attn_ma, lvl_attn_mstd, resized_meta_img, meta_info, tag):
 	meta_att_norm = []
+	att_h = int(sqrt(curr_trg_attention[0].shape[1]))
 	for j, prop_mask in enumerate(per_trg_prop_mask):
 		lvl, h, w, = prop_mask.long()
-		curr_prop_att = curr_trg_attention[lvl][...,h,w].reshape(-1, 16, 16)
+		curr_prop_att = curr_trg_attention[lvl][...,h,w].reshape(-1, att_h, att_h)
 		curr_prop_overlay = copy.deepcopy(input_image)
 		curr_prop_overlay = torch.tensor(overlay_boxes(curr_prop_overlay.numpy().transpose(1,2,0), per_trg_prop[j:j+1].to("cpu"))).permute(2,0,1)
 
 		storage.put_image("{}_proposal_{}/proposal".format(tag,j), scale_f(curr_prop_overlay / 256, 0.4))
 
 		for k, (meta_img, per_cls_info) in enumerate(zip(resized_meta_img, meta_info)):
-			meta_att = interpolate(curr_prop_att[k].view(1,1,16,16), per_cls_info['img_info'][:2]).squeeze(0).cpu()
+			meta_att = interpolate(curr_prop_att[k].view(1,1,att_h, att_h), per_cls_info['img_info'][:2]).squeeze(0).cpu()
 			meta_att = (((meta_att - lvl_attn_ma[j]) / lvl_attn_mstd[j])).sigmoid()
 
 			storage.put_image("{}_proposal_{}/attention/{}".format(tag,j,k), scale_f(meta_img * meta_att, 0.4))

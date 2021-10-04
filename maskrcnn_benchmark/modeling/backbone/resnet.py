@@ -17,6 +17,7 @@ Custom implementations may be written in user code and hooked in via the
 `register_*` functions.
 """
 from collections import namedtuple
+from maskrcnn_benchmark.layers.misc import ConvTranspose2d
 
 import torch
 import torch.nn.functional as F

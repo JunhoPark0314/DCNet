@@ -26,7 +26,6 @@ class _NewEmptyTensorOp(torch.autograd.Function):
         shape = ctx.shape
         return _NewEmptyTensorOp.apply(grad, shape), None
 
-
 class Conv2d(torch.nn.Conv2d):
     def forward(self, x):
         if x.numel() > 0:

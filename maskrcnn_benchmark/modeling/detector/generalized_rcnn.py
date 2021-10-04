@@ -45,7 +45,7 @@ class GeneralizedRCNN(nn.Module):
         self.maskpool = cfg.MODEL.MASKPOOL
         self.num_classes = cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES
         if self.dense_relation:
-            self.drd_opt = DenseRelationDistill(256,32,128,self.dense_sum, cfg.MODEL.DENSE_SIGMOID)
+            self.drd_opt = DenseRelationDistill(256,32,128,self.dense_sum, cfg.MODEL.DENSE_SIGMOID, cfg.MODEL.DENSE_ZP)
         
         self.sigmoid = nn.Sigmoid()
         self.maxpool = nn.MaxPool2d(2)

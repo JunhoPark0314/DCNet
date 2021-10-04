@@ -6,7 +6,7 @@ from maskrcnn_benchmark.utils.events import get_event_storage
  
 class DenseRelationDistill(nn.Module):
 
-    def __init__(self, indim, keydim, valdim, dense_sum=False, sigmoid_attn=False, no_padding=False):
+    def __init__(self, indim, keydim, valdim, dense_sum=False, sigmoid_attn=False, no_padding=False, per_level_bn=False):
         super(DenseRelationDistill,self).__init__()
         #self.key_q = nn.Conv2d(indim, keydim, kernel_size=(3,3), padding=(1,1), stride=1)
         #self.value_q = nn.Conv2d(indim, valdim, kernel_size=(3,3), padding=(1,1), stride=1)
@@ -42,7 +42,14 @@ class DenseRelationDistill(nn.Module):
             self.combine = nn.Conv2d(512,256,kernel_size=1,padding=0,stride=1)
         
         if self.sigmoid_attn:
-            self.attn_bnn = nn.BatchNorm1d(bn_dim)
+            self.sigmoid_attn_bnn = nn.ModuleList([
+                nn.BatchNorm1d(bn_dim) for _ in range(5)])
+
+            if per_level_bn:
+                self.attn_bnn = lambda x: self.sigmoid_attn_bnn[x]
+            else:
+                self.attn_bnn = lambda x: self.sigmoid_attn_bnn[0]
+
             self.temperature = 10
    
     def forward(self,features,attentions):
@@ -82,7 +89,7 @@ class DenseRelationDistill(nn.Module):
                         temperature = max(self.temperature * curr_prog, 2)
                     else:
                         temperature = 2
-                    p = (self.attn_bnn(p) / temperature).sigmoid()
+                    p = (self.attn_bnn[idx](p) / temperature).sigmoid()
                 else:
                     p = F.softmax(p,dim=1)
                 

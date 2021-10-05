@@ -98,7 +98,8 @@ def train(cfg, local_rank, distributed, phase, shot, split):
         shot,
         split,
         arguments,
-        writer=writer
+        writer=writer,
+        meta_crop_shot=cfg.INPUT.META_CROP
     )
 
     return model

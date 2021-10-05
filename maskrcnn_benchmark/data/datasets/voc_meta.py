@@ -1,4 +1,5 @@
 import torch
+from torch import nn
 import torch.utils.data
 from PIL import Image
 import sys
@@ -7,6 +8,7 @@ import os
 import os.path
 import random
 import numpy as np
+from torchvision.transforms.transforms import RandomResizedCrop, RandomHorizontalFlip
 if sys.version_info[0] == 2:
     import xml.etree.cElementTree as ET
 else:
@@ -121,13 +123,15 @@ class PascalVOCDataset_Meta(torch.utils.data.Dataset):
         "sofa",
     )
 
-    def __init__(self, data_dir, split, use_difficult=False, transforms=None, toofew=True, shots=200, size=224, seed=0):
+    def __init__(self, data_dir, split, use_difficult=False, transforms=None, toofew=True, shots=200, size=224, seed=0, crop=0):
 
         # data_dir: "voc/VOC2007"  ,split: "trainval_split1_base"
         self.root = data_dir
         self.image_set = split
         self.keep_difficult = use_difficult
         self.transforms = transforms
+        self.crop= crop
+
 
         self._annopath = os.path.join(self.root, "Annotations", "%s.xml")
         self._imgpath = os.path.join(self.root, "JPEGImages", "%s.jpg")
@@ -193,8 +197,12 @@ class PascalVOCDataset_Meta(torch.utils.data.Dataset):
                 for j in range(len(self.cls)):
                     metaid.append([j,self.metalines[j][i].rstrip()])
                 self.ids.append(metaid)
-             
 
+        if self.crop:
+            self.crop_transform = nn.Sequential(*[
+                RandomResizedCrop(size=self.img_size, scale=(0.8, 1.0), ratio=(1.0,1.0)),
+                RandomHorizontalFlip(),
+            ])
 
     def __getitem__(self, index):
         img_ids = self.ids[index]
@@ -207,13 +215,23 @@ class PascalVOCDataset_Meta(torch.utils.data.Dataset):
             
             img -= np.array([[[102.9801, 115.9465, 122.7717]]])
             height, width, _ = img.shape
-            img = cv2.resize(img, (self.img_size, self.img_size), interpolation=cv2.INTER_LINEAR)
-            #img = Image.open(img_id).convert("RGB")
-            mask, mask_info = self.get_mask(img_id, cls_id, height, width)
-            img = torch.from_numpy(img).unsqueeze(0)
-            mask = torch.from_numpy(mask).unsqueeze(0).unsqueeze(3)
-            imgmask = torch.cat([img,mask],dim=3)
-            imgmask = imgmask.permute(0, 3, 1, 2).contiguous()
+
+            if self.crop:
+                mask, mask_info = self.get_mask(img_id, cls_id, height, width)
+                img = torch.from_numpy(img).unsqueeze(0)
+                mask = torch.from_numpy(mask).unsqueeze(0).unsqueeze(3)
+                imgmask = torch.cat([img,mask],dim=3)
+                imgmask = imgmask.permute(0, 3, 1, 2).contiguous()
+                imgmask = self.crop_transform(imgmask.repeat(self.crop,1,1,1))
+            else:
+                img = cv2.resize(img, (self.img_size, self.img_size), interpolation=cv2.INTER_LINEAR)
+                #img = Image.open(img_id).convert("RGB")
+                mask, mask_info = self.get_mask(img_id, cls_id, height, width)
+                img = torch.from_numpy(img).unsqueeze(0)
+                mask = torch.from_numpy(mask).unsqueeze(0).unsqueeze(3)
+                imgmask = torch.cat([img,mask],dim=3)
+                imgmask = imgmask.permute(0, 3, 1, 2).contiguous()
+
             data.append(imgmask)
             data_info.append({"mask_info":mask_info, "img_info": origin_shape})
         res = torch.cat(data,dim=0)
@@ -235,9 +253,14 @@ class PascalVOCDataset_Meta(torch.utils.data.Dataset):
         return len(self.ids)
     
     def get_mask(self, img_id, cls_id, height, width):
-        mask = np.zeros((self.img_size, self.img_size), dtype=np.float32)
-        y_ration = float(height) / self.img_size
-        x_ration = float(width) / self.img_size
+        if self.crop:
+            y_ration = 1
+            x_ration = 1
+            mask = np.zeros((height, width), dtype=np.float32)
+        else:
+            y_ration = float(height) / self.img_size
+            x_ration = float(width) / self.img_size
+            mask = np.zeros((self.img_size, self.img_size), dtype=np.float32)
         mask_info = []
 
         path = img_id.split('JPEG')[0]+'Annotations/'+img_id.split('/')[-1].split('.jpg')[0]+'.xml'

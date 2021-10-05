@@ -14,7 +14,7 @@ from .collate_batch import BatchCollator, BBoxAugCollator
 from .transforms import build_transforms
 
 
-def build_dataset(dataset_list, transforms, dataset_catalog, is_train=True, shots=200, size=224,seed=0):
+def build_dataset(dataset_list, transforms, dataset_catalog, is_train=True, shots=200, size=224,seed=0, crop=False):
     """
     Arguments:
         dataset_list (list[str]): Contains the names of the datasets, i.e.,
@@ -46,6 +46,7 @@ def build_dataset(dataset_list, transforms, dataset_catalog, is_train=True, shot
             args["shots"] = shots
             args["size"] = size
             args["seed"] = seed
+            args["crop"] = crop
         if data["factory"] == "COCODataset_Meta":
             args["transforms"] = None
             args["shots"] = shots
@@ -169,7 +170,8 @@ def make_data_loader(cfg, is_train=True, is_distributed=False, start_iter=0, met
     shots = cfg.INPUT.SHOTS
     size = cfg.INPUT.META_SIZE
     seed = cfg.MODEL.SEED
-    datasets = build_dataset(dataset_list, transforms, DatasetCatalog, is_train, shots,size,seed)
+    crop = cfg.INPUT.META_CROP
+    datasets = build_dataset(dataset_list, transforms, DatasetCatalog, is_train, shots,size,seed, crop)
 
     if 'standard' in dataset_list[0] or 'meta' in dataset_list[0]:
         aspect_grouping = False

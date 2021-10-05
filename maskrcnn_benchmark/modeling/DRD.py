@@ -89,7 +89,7 @@ class DenseRelationDistill(nn.Module):
                         temperature = max(self.temperature * curr_prog, 2)
                     else:
                         temperature = 2
-                    p = (self.attn_bnn[idx](p) / temperature).sigmoid()
+                    p = (self.attn_bnn(idx)(p) / temperature).sigmoid()
                 else:
                     p = F.softmax(p,dim=1)
                 

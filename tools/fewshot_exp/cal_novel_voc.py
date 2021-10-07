@@ -1,8 +1,11 @@
 from maskrcnn_benchmark.data.datasets.voc import PascalVOCDataset
 import sys
+print(sys.argv)
 # arg 1: pathdir;
-for split in range(1, 4):
-    for shot in [1, 2, 3, 5, 10]:
+#for split in range(1, 4):
+for split in range(1,2):
+    #for shot in [1, 2, 3, 5, 10]:
+    for shot in [1,2, 3, 5,10]:
         all_cls = PascalVOCDataset.CLASSES
         novel_cls = [PascalVOCDataset.CLASSES_SPLIT1_NOVEL, 
                      PascalVOCDataset.CLASSES_SPLIT2_NOVEL,

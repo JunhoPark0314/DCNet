@@ -88,7 +88,10 @@ def do_train(
                 meta_input, meta_info = next(meta_iter)
                 meta_input = meta_input.to(device)
         
-            num_classes = meta_input.shape[0] // meta_crop_shot
+            if meta_crop_shot:
+                num_classes = meta_input.shape[0] // meta_crop_shot
+            else:
+                num_classes = meta_input.shape[0]
 
             targets = [target.to(device) for target in targets]
             loss_dict, result = model(images, targets, meta_input)
@@ -168,7 +171,11 @@ def do_train(
 
                 images = images.to(device)
                 meta_input = meta_input.to(device)
-                num_classes = meta_input.shape[0] // meta_crop_shot
+
+                if meta_crop_shot:
+                    num_classes = meta_input.shape[0] // meta_crop_shot
+                else:
+                    num_classes = meta_input.shape[0]
             
                 meta_label = []
                 for n in range(num_classes):

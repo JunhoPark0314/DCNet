@@ -64,7 +64,7 @@ _C.INPUT.BRIGHTNESS = 0.0
 _C.INPUT.CONTRAST = 0.0
 _C.INPUT.SATURATION = 0.0
 _C.INPUT.HUE = 0.0
-_C.INPUT.META_CROP = 1
+_C.INPUT.META_CROP = 0
 
 
 # -----------------------------------------------------------------------------

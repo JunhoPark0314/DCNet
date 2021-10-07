@@ -5,8 +5,14 @@ split=int(sys.argv[1])
 checkpoint = torch.load('model_voc_split%d_base.pth'%split, map_location=torch.device("cpu"))
 model = checkpoint['model']
 aimclass = 21
-change = [('module.roi_heads.box.predictor.cls_score.weight', (aimclass, 1024)), 
+module_change = [('module.roi_heads.box.predictor.cls_score.weight', (aimclass, 1024)), 
           ('module.roi_heads.box.predictor.cls_score.bias'  , aimclass)]
+change = [('roi_heads.box.predictor.cls_score.weight', (aimclass, 1024)), 
+          ('roi_heads.box.predictor.cls_score.bias'  , aimclass)]
+
+if "module.roi_heads.box.predictor.cls_score.weight" in model:
+    change = module_change
+
 t = torch.empty(change[0][1])
 torch.nn.init.normal_(t, std=0.001)
 model[change[0][0]] = t

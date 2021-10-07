@@ -189,6 +189,7 @@ _C.MODEL.RPN.FPN_POST_NMS_PER_BATCH = True
 _C.MODEL.RPN.RPN_HEAD = "SingleConvRPNHead"
 
 
+
 # ---------------------------------------------------------------------------- #
 # ROI HEADS options
 # ---------------------------------------------------------------------------- #
@@ -485,3 +486,8 @@ _C.DTYPE = "float32"
 
 # Enable verbosity in apex.amp
 _C.AMP_VERBOSE = False
+
+
+_C.GDL = CN()
+_C.GDL.ENABLED = False
+_C.GDL.ALPHA = 0.1

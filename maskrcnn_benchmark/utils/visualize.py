@@ -1,3 +1,4 @@
+import itertools
 import cv2
 import torch
 from maskrcnn_benchmark.utils.events import EventStorage, get_event_storage
@@ -6,6 +7,8 @@ import numpy as np
 from torch.nn.functional import interpolate
 from math import sqrt
 scale_f = lambda x,y : interpolate(x.unsqueeze(0), scale_factor=y).squeeze(0)
+SCALE = 0.7
+STD_SCALE = 0.5
 
 def visualize_episode(meta_input, meta_info, input, targets, results, writer, coco=False):
 	storage = get_event_storage()
@@ -16,13 +19,20 @@ def visualize_episode(meta_input, meta_info, input, targets, results, writer, co
 	input_image = input_image[:,[2,1,0],...]
 	meta_input_mask = meta_input_cpu[:,-1,...]
 
+	crop_image = len(meta_input_image) // len(meta_info)
+	meta_info = list(itertools.chain(*[[x]*crop_image for x in meta_info]))
+
 	resized_meta_img = []
 	for i, per_cls_info in enumerate(meta_info):
-		resized_img = cv2.resize(meta_input_image[i].permute(1,2,0).numpy(), dsize=per_cls_info['img_info'][:2][::-1])
+		if crop_image == 1:
+			resized_img = cv2.resize(meta_input_image[i].permute(1,2,0).numpy(), dsize=per_cls_info['img_info'][:2][::-1])
+		else:
+			resized_img = meta_input_image[i].permute(1,2,0).numpy()
+			per_cls_info["img_info"] = (256, 256, 3)
 		resized_img = torch.tensor(resized_img).permute(2, 0, 1)
 		resized_meta_img.append(resized_img)
 
-		storage.put_image("meta_input/{}".format(i), scale_f(resized_img, 0.4))
+		storage.put_image("meta_input/{}".format(i), scale_f(resized_img, SCALE))
 	
 	for i, (per_trg_gt, per_trg_prop, per_trg_roi, per_trg_prop_mask, curr_trg_attention) in \
 		enumerate(zip(targets, results["proposal"], results["roi"], results["prop_logs"]["box_mask"], list(results["attention"].values()))):
@@ -75,7 +85,7 @@ def attention_histogram(curr_trg_attention, lvl_attn_ma, lvl_attn_mstd, storage)
 		storage.put_scalar("att_mean_mean/lvl{}".format(j), mean_att.mean())
 		storage.put_scalar("att_std_mean/lvl{}".format(j), std_att.mean())
 		lvl_attn_ma[j] = storage.latest_with_smoothing_hint(20)["att_mean_mean/lvl{}".format(j)][0]
-		lvl_attn_mstd[j] = storage.latest_with_smoothing_hint(20)["att_std_mean/lvl{}".format(j)][0]
+		lvl_attn_mstd[j] = storage.latest_with_smoothing_hint(20)["att_std_mean/lvl{}".format(j)][0] * STD_SCALE
 
 def visualize_detection_result(input_image, per_trg_gt, per_trg_prop, per_trg_roi, img_idx, storage):
 	gt_overlay = copy.deepcopy(input_image)
@@ -86,7 +96,7 @@ def visualize_detection_result(input_image, per_trg_gt, per_trg_prop, per_trg_ro
 	prop_overlay = torch.tensor(overlay_boxes(prop_overlay.numpy().transpose(1,2,0), per_trg_prop.to("cpu"))).permute(2,0,1)
 	roi_overlay = torch.tensor(overlay_boxes(roi_overlay.numpy().transpose(1,2,0), per_trg_roi.to("cpu"))).permute(2,0,1)
 	
-	storage.put_image("target/{}".format(img_idx), scale_f(torch.cat([gt_overlay, prop_overlay, roi_overlay], dim=-1) / 256, 0.4))
+	storage.put_image("target/{}".format(img_idx), scale_f(torch.cat([gt_overlay, prop_overlay, roi_overlay], dim=-1) / 256, SCALE))
 
 def visualize_attention(per_trg_prop_mask, curr_trg_attention, input_image, per_trg_prop, storage, lvl_attn_ma, lvl_attn_mstd, resized_meta_img, meta_info, tag):
 	meta_att_norm = []
@@ -97,13 +107,13 @@ def visualize_attention(per_trg_prop_mask, curr_trg_attention, input_image, per_
 		curr_prop_overlay = copy.deepcopy(input_image)
 		curr_prop_overlay = torch.tensor(overlay_boxes(curr_prop_overlay.numpy().transpose(1,2,0), per_trg_prop[j:j+1].to("cpu"))).permute(2,0,1)
 
-		storage.put_image("{}_proposal_{}/proposal".format(tag,j), scale_f(curr_prop_overlay / 256, 0.4))
+		storage.put_image("{}_proposal_{}/proposal".format(tag,j), scale_f(curr_prop_overlay / 256, SCALE))
 
 		for k, (meta_img, per_cls_info) in enumerate(zip(resized_meta_img, meta_info)):
 			meta_att = interpolate(curr_prop_att[k].view(1,1,att_h, att_h), per_cls_info['img_info'][:2]).squeeze(0).cpu()
 			meta_att = (((meta_att - lvl_attn_ma[j]) / lvl_attn_mstd[j])).sigmoid()
 
-			storage.put_image("{}_proposal_{}/attention/{}".format(tag,j,k), scale_f(meta_img * meta_att, 0.4))
+			storage.put_image("{}_proposal_{}/attention/{}".format(tag,j,k), scale_f(meta_img * meta_att, SCALE))
 			meta_att_norm.append((meta_att ** 2).mean().sqrt())
 	if len(meta_att_norm):
 		storage.put_histogram("{}_att_norm".format(tag), torch.stack(meta_att_norm))

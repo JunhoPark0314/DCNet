@@ -8,7 +8,9 @@ import os
 import os.path
 import random
 import numpy as np
-from torchvision.transforms.transforms import RandomResizedCrop, RandomHorizontalFlip
+from torchvision.transforms import Compose
+from torchvision.transforms.transforms import RandomAffine, RandomResizedCrop, RandomHorizontalFlip, RandomCrop
+from maskrcnn_benchmark.data.transforms.transforms import NRandomCrop, Resize, ResizeWiMin
 if sys.version_info[0] == 2:
     import xml.etree.cElementTree as ET
 else:
@@ -199,8 +201,11 @@ class PascalVOCDataset_Meta(torch.utils.data.Dataset):
                 self.ids.append(metaid)
 
         if self.crop:
+
             self.crop_transform = nn.Sequential(*[
-                RandomResizedCrop(size=self.img_size, scale=(0.8, 1.0), ratio=(1.0,1.0)),
+                RandomAffine(degrees=0, scale=(0.5, 1.5)),
+                ResizeWiMin(min_size=300, max_size=None),
+                NRandomCrop(size=self.img_size, n=self.crop),
                 RandomHorizontalFlip(),
             ])
 
@@ -222,7 +227,7 @@ class PascalVOCDataset_Meta(torch.utils.data.Dataset):
                 mask = torch.from_numpy(mask).unsqueeze(0).unsqueeze(3)
                 imgmask = torch.cat([img,mask],dim=3)
                 imgmask = imgmask.permute(0, 3, 1, 2).contiguous()
-                imgmask = self.crop_transform(imgmask.repeat(self.crop,1,1,1))
+                imgmask = self.crop_transform(imgmask)
             else:
                 img = cv2.resize(img, (self.img_size, self.img_size), interpolation=cv2.INTER_LINEAR)
                 #img = Image.open(img_id).convert("RGB")

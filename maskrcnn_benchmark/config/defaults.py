@@ -64,7 +64,7 @@ _C.INPUT.BRIGHTNESS = 0.0
 _C.INPUT.CONTRAST = 0.0
 _C.INPUT.SATURATION = 0.0
 _C.INPUT.HUE = 0.0
-_C.INPUT.META_CROP = 1
+_C.INPUT.META_CROP = 0
 
 
 # -----------------------------------------------------------------------------
@@ -187,6 +187,7 @@ _C.MODEL.RPN.FPN_POST_NMS_TOP_N_TEST = 2000
 _C.MODEL.RPN.FPN_POST_NMS_PER_BATCH = True
 # Custom rpn head, empty to use default conv or separable conv
 _C.MODEL.RPN.RPN_HEAD = "SingleConvRPNHead"
+
 
 
 # ---------------------------------------------------------------------------- #
@@ -485,3 +486,8 @@ _C.DTYPE = "float32"
 
 # Enable verbosity in apex.amp
 _C.AMP_VERBOSE = False
+
+
+_C.GDL = CN()
+_C.GDL.ENABLED = False
+_C.GDL.ALPHA = 0.1

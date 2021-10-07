@@ -119,10 +119,6 @@ class RPNHead(nn.Module):
         return logits, bbox_reg, features
 
 
-            
-            
-
-
 
 class RPNModule(torch.nn.Module):
     """
@@ -154,6 +150,12 @@ class RPNModule(torch.nn.Module):
         self.box_selector_train = box_selector_train
         self.box_selector_test = box_selector_test
         self.loss_evaluator = loss_evaluator
+
+        def gdl_hook(module, input_grad, output_grad):
+            return (output_grad * cfg.GDL.ALPHA,)
+
+        if cfg.GDL.ENABLED: 
+            self.register_full_backward_hook(gdl_hook)
 
     def forward(self, images, features, targets=None):
         """
@@ -220,6 +222,8 @@ class RPNModule(torch.nn.Module):
             "box_mask": box_mask
         }
         return boxes, {}, logs 
+    
+
 
 
 def build_rpn(cfg, in_channels):

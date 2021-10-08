@@ -9,7 +9,7 @@ import os.path
 import random
 import numpy as np
 from torchvision.transforms import Compose
-from torchvision.transforms.transforms import RandomAffine, RandomResizedCrop, RandomHorizontalFlip, RandomCrop
+from torchvision.transforms.transforms import FiveCrop, RandomAffine, RandomResizedCrop, RandomHorizontalFlip, RandomCrop
 from maskrcnn_benchmark.data.transforms.transforms import NRandomCrop, Resize, ResizeWiMin
 if sys.version_info[0] == 2:
     import xml.etree.cElementTree as ET
@@ -203,7 +203,7 @@ class PascalVOCDataset_Meta(torch.utils.data.Dataset):
         if self.crop:
 
             self.crop_transform = nn.Sequential(*[
-                RandomAffine(degrees=0, scale=(0.5, 1.5)),
+                #RandomAffine(degrees=0, scale=(0.5, 1.5)),
                 ResizeWiMin(min_size=300, max_size=None),
                 NRandomCrop(size=self.img_size, n=self.crop),
                 RandomHorizontalFlip(),

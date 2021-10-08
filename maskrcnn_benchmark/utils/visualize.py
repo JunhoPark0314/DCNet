@@ -7,7 +7,7 @@ import numpy as np
 from torch.nn.functional import interpolate
 from math import sqrt
 scale_f = lambda x,y : interpolate(x.unsqueeze(0), scale_factor=y).squeeze(0)
-SCALE = 0.7
+SCALE = 0.4
 STD_SCALE = 1
 
 def visualize_episode(meta_input, meta_info, input, targets, results, writer, coco=False):
@@ -77,15 +77,19 @@ def sample_result(per_trg_prop, per_trg_roi, per_trg_prop_mask, prop_mask, roi_m
 	return trg_prop, trg_roi, trg_prop_mask
 
 def attention_histogram(curr_trg_attention, lvl_attn_ma, lvl_attn_mstd, storage):
+	mean_stat = {}
 	for j, att_per_lvl in enumerate(curr_trg_attention):
-		mean_att = att_per_lvl.mean(dim=1)[0].flatten(1,-1)
-		std_att = att_per_lvl.std(dim=1)[0].flatten(1, -1)
-		for k, per_cls_att in enumerate(mean_att):
-			storage.put_histogram("lvl{}_att/cls{}".format(j, k), per_cls_att * 256)
-		storage.put_scalar("att_mean_mean/lvl{}".format(j), mean_att.mean())
-		storage.put_scalar("att_std_mean/lvl{}".format(j), std_att.mean())
-		lvl_attn_ma[j] = storage.latest_with_smoothing_hint(20)["att_mean_mean/lvl{}".format(j)][0]
-		lvl_attn_mstd[j] = storage.latest_with_smoothing_hint(20)["att_std_mean/lvl{}".format(j)][0] * STD_SCALE
+		std_stat = {
+			"CSQ_std": att_per_lvl.std(),
+			"SQ_std": att_per_lvl.flatten(2, -1).permute(2, 0, 1).std(dim=1).mean(),
+			"CQ_std": att_per_lvl.flatten(2,).std(dim=1).mean()
+		}
+		mean_stat["lvl{}".format(j)] = att_per_lvl.mean()
+		storage.put_scalar_dict("lvl{}_std".format(j), std_stat)
+		lvl_attn_ma[j] = att_per_lvl.mean()
+		lvl_attn_mstd[j] = att_per_lvl.std()
+
+	storage.put_scalar_dict("mean_stat", mean_stat)
 
 def visualize_detection_result(input_image, per_trg_gt, per_trg_prop, per_trg_roi, img_idx, storage):
 	gt_overlay = copy.deepcopy(input_image)
@@ -103,7 +107,7 @@ def visualize_attention(per_trg_prop_mask, curr_trg_attention, input_image, per_
 	att_h = int(sqrt(curr_trg_attention[0].shape[1]))
 	for j, prop_mask in enumerate(per_trg_prop_mask):
 		lvl, h, w, = prop_mask.long()
-		curr_prop_att = curr_trg_attention[lvl][...,h,w].reshape(-1, att_h, att_h)
+		curr_prop_att = curr_trg_attention[lvl][...,h,w].reshape(-1, att_h, att_h).cpu()
 		curr_prop_overlay = copy.deepcopy(input_image)
 		curr_prop_overlay = torch.tensor(overlay_boxes(curr_prop_overlay.numpy().transpose(1,2,0), per_trg_prop[j:j+1].to("cpu"))).permute(2,0,1)
 
@@ -111,9 +115,14 @@ def visualize_attention(per_trg_prop_mask, curr_trg_attention, input_image, per_
 
 		for k, (meta_img, per_cls_info) in enumerate(zip(resized_meta_img, meta_info)):
 			meta_att = interpolate(curr_prop_att[k].view(1,1,att_h, att_h), per_cls_info['img_info'][:2]).squeeze(0).cpu()
-			meta_att = (((meta_att - lvl_attn_ma[j]) / lvl_attn_mstd[j])).sigmoid()
+			#query_lvl_att = (((meta_att - lvl_attn_ma[j]) / lvl_attn_mstd[j])).sigmoid()
+			#support_lvl_att = ((meta_att - curr_prop_att.mean()) / curr_prop_att.std()).sigmoid()
+			local_lvl_att = ((meta_att - meta_att.mean()) / meta_att.std()).sigmoid()
+			#vis_att = torch.cat([query_lvl_att, support_lvl_att, local_lvl_att]).flatten(0, 1)
+			#meta_img = meta_img.unsqueeze(1).repeat(1, 3, 1, 1).flatten(1, 2)
+			vis_att = local_lvl_att
 
-			storage.put_image("{}_proposal_{}/attention/{}".format(tag,j,k), scale_f(meta_img * meta_att, SCALE))
+			storage.put_image("{}_proposal_{}/attention/{}".format(tag,j,k), scale_f(meta_img * vis_att, SCALE))
 			meta_att_norm.append((meta_att ** 2).mean().sqrt())
 	if len(meta_att_norm):
 		storage.put_histogram("{}_att_norm".format(tag), torch.stack(meta_att_norm))

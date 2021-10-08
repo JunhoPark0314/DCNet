@@ -153,7 +153,14 @@ class TensorboardXWriter(EventWriter):
             if iter > self._last_write:
                 self._writer.add_scalar(k, v, iter)
                 new_last_write = max(new_last_write, iter)
+
+        for k, (v, iter) in storage._latest_dict.items():
+            if iter > self._last_write:
+                self._writer.add_scalars(k, v, iter)
+                new_last_write = max(new_last_write, iter)
+
         self._last_write = new_last_write
+
 
         # storage.put_{image,histogram} is only meant to be used by
         # tensorboard writer. So we access its internal fields directly from here.
@@ -275,6 +282,7 @@ class EventStorage:
         self._history = defaultdict(HistoryBuffer)
         self._smoothing_hints = {}
         self._latest_scalars = {}
+        self._latest_dict = {} 
         self._iter = start_iter
         self._current_prefix = ""
         self._vis_data = []
@@ -422,6 +430,21 @@ class EventStorage:
                 itr,
             )
         return result
+
+    def put_scalar_dict(self, name, value):
+        """
+        Add a scalar `value` to the `HistoryBuffer` associated with `name`.
+
+        Args:
+            smoothing_hint (bool): a 'hint' on whether this scalar is noisy and should be
+                smoothed when logged. The hint will be accessible through
+                :meth:`EventStorage.smoothing_hints`.  A writer may ignore the hint
+                and apply custom smoothing rule.
+
+                It defaults to True because most scalars we save need to be smoothed to
+                provide any useful signal.
+        """
+        self._latest_dict[name] = (value, self._iter)
 
     def smoothing_hints(self):
         """

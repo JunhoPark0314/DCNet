@@ -93,7 +93,7 @@ class DenseRelationDistill(nn.Module):
                 else:
                     p = F.softmax(p,dim=1)
                 
-                full_attention[i].append(F.interpolate(p.permute(0,2,1).view(ncls, att_h * att_w, att_h, att_w), size=(H,W), mode='bilinear', align_corners=True))
+                full_attention[i].append(F.interpolate(p.view(ncls, att_h * att_w, att_h, att_w), size=(H,W), mode='bilinear', align_corners=True))
 
                 val_t_out = torch.matmul(val_t.view(ncls,128,-1),p).view(ncls,128,att_h,att_w)  
                 for j in range(ncls):

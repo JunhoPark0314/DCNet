@@ -8,7 +8,7 @@ from torch.nn.functional import interpolate
 from math import sqrt
 scale_f = lambda x,y : interpolate(x.unsqueeze(0), scale_factor=y).squeeze(0)
 SCALE = 0.7
-STD_SCALE = 0.5
+STD_SCALE = 1
 
 def visualize_episode(meta_input, meta_info, input, targets, results, writer, coco=False):
 	storage = get_event_storage()

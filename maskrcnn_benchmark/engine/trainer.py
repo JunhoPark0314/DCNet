@@ -93,6 +93,15 @@ def do_train(
                 num_classes = meta_input.shape[0] // meta_crop_shot
             else:
                 num_classes = meta_input.shape[0]
+            
+            if cfg.MODEL.SHUFFLE_CLS:
+                curr_perm = torch.randperm(len(meta_input))
+                reverse_map = {k.item()+1:v.item()+1 for k,v in zip(torch.arange(len(meta_input)), curr_perm)}
+                meta_input = meta_input[curr_perm]
+                for i, t in enumerate(targets):
+                    curr_labels = t.extra_fields["labels"]
+                    curr_labels = torch.tensor([reverse_map[x.item()] for x in curr_labels])
+                    targets[i].extra_fields["labels"] = curr_labels
 
             targets = [target.to(device) for target in targets]
             loss_dict, result = model(images, targets, meta_input)

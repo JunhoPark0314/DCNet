@@ -60,10 +60,12 @@ class DenseRelationDistill(nn.Module):
                 SharedBatchNorm2d(num_features=bn_dim, num_shared=2) for _ in range(5)
             ])
             """
-            self.concat_bnn = SharedBatchNorm2d(num_features=bn_dim, num_shared=1)
-            self.attn_bnn = SharedBatchNorm2d(num_features=bn_dim, num_shared=1)
+            self.key_bnn = SharedBatchNorm2d(num_features=keydim, num_shared=2)
+            self.val_bnn = SharedBatchNorm2d(num_features=valdim, num_shared=2)
+            self.level_bnn = nn.BatchNorm2d(num_features=bn_dim)
    
     def forward(self,features,attentions):
+        """
         old_features = features
         old_attentions = (attentions)
         if self.normalize_concat and isinstance(attentions, dict) is False:
@@ -71,6 +73,14 @@ class DenseRelationDistill(nn.Module):
             attentions = self.attn_bnn(attentions.detach(), share_id=0)
         else:
             features = list(features)
+        """
+        storage = get_event_storage()
+        if storage.iter % 10 == 0:
+            for i,f in enumerate(features):
+                print('f{}'.format(i), torch.std_mean(f))
+            print('a',torch.std_mean(attentions))
+
+        features = list(features)
         if isinstance(attentions,dict):
             for i in range(len(attentions)):
                 if i==0:
@@ -84,6 +94,8 @@ class DenseRelationDistill(nn.Module):
         ncls = attentions.shape[0]       
         key_t = self.key_t(attentions)   
         val_t = self.value_t(attentions) 
+        if self.normalize_concat:
+            key_t = self.key_bnn(key_t, share_id=1)
 
         att_h, att_w = val_t.shape[2:]
         for idx in range(len(features)):
@@ -91,8 +103,13 @@ class DenseRelationDistill(nn.Module):
             bs = feature.shape[0]       
             H , W = feature.shape[2:]
             feature = F.interpolate(feature,size=(h,w),mode='bilinear',align_corners=True)
-            key_q = eval('self.key_q'+str(idx))(feature).view(bs,32,-1) 
+            key_q = eval('self.key_q'+str(idx))(feature) 
             val_q = eval('self.value_q'+str(idx))(feature)   
+            if self.normalize_concat:
+                val_q = self.val_bnn(val_q, share_id=0) / len(key_t)
+                key_q = self.key_bnn(key_q, share_id=0)
+            key_q = key_q.view(bs,32,-1)
+
             for i in range(bs):
                 kq = key_q[i].unsqueeze(0).permute(0,2,1)   
                 vq = val_q[i].unsqueeze(0)                  
@@ -114,6 +131,9 @@ class DenseRelationDistill(nn.Module):
 
                 val_t_out = torch.matmul(val_t.view(ncls,128,-1),p).view(ncls,128,att_h,att_w)  
 
+                if self.normalize_concat:
+                    val_t_out = self.val_bnn(val_t_out, share_id=1)
+
                 for j in range(ncls):
                     if(j==0):
                         final_2 = torch.cat((vq,val_t_out[j].unsqueeze(0)),dim=1)
@@ -133,6 +153,8 @@ class DenseRelationDistill(nn.Module):
         if self.add_one_more:
             if self.sum:
                 for i in range(len(output)):
+                    if self.normalize_concat:
+                        features[i] = self.level_bnn(features[i])
                     output[i] = self.combine(torch.cat((features[i],output[i]),dim=1))
         output = tuple(output)
         

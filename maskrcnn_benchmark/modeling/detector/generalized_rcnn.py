@@ -107,7 +107,7 @@ class GeneralizedRCNN(nn.Module):
         torch.cuda.empty_cache()
         if average_shot:
             attentions = self.meta_extractor(meta_input,dr=self.dense_relation)
-            attentions = F.interpolate(attentions, (26, 26))
+            attentions = F.interpolate(attentions, (16, 16))
             return attentions
         if self.training and targets is None:
             raise ValueError("In training mode, targets should be passed")

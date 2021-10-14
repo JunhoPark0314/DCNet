@@ -81,7 +81,7 @@ def attention_histogram(curr_trg_attention, lvl_attn_ma, lvl_attn_mstd, storage)
 	for j, (att_per_lvl, _) in enumerate(curr_trg_attention):
 		std_stat = {
 			"CSQ_std": att_per_lvl.std(),
-			"SQ_std": att_per_lvl.flatten(2, -1).permute(2, 0, 1).std(dim=1).mean(),
+			"SQ_std": att_per_lvl.flatten(2, -1).permute(2, 0, 1).std(dim=1).topk(16)[0].mean(),
 			"CQ_std": att_per_lvl.flatten(2,).std(dim=1).mean()
 		}
 		mean_stat["lvl{}".format(j)] = att_per_lvl.mean()

@@ -42,8 +42,10 @@ _C.INPUT = CN()
 # Size of the smallest side of the image during training
 _C.INPUT.MIN_SIZE_RANGE_TRAIN = (0, )
 _C.INPUT.MIN_SIZE_TRAIN = (800, )
+_C.INPUT.MIN_SIZE_META = (300, )
 # Maximum size of the side of the image during training
 _C.INPUT.MAX_SIZE_TRAIN = 1333
+_C.INPUT.MAX_SIZE_META = 700
 # Size of the smallest side of the image during testing
 _C.INPUT.MIN_SIZE_TEST = 800
 # Maximum size of the side of the image during testing
@@ -137,6 +139,8 @@ _C.MODEL.DENSE_SIGMOID = False
 _C.MODEL.DENSE_ZP = False
 _C.MODEL.DENSE_SUM = False
 _C.MODEL.DENSE_PER_LVL_BN = False
+_C.MODEL.CONCAT_BN = False
+_C.MODEL.ADD_ONE_MORE = True
 _C.MODEL.MULTI_LEVEL = False
 _C.MODEL.LAYER3 = False
 _C.MODEL.LAYER1 = False

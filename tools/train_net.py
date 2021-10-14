@@ -98,6 +98,7 @@ def train(cfg, local_rank, distributed, phase, shot, split):
         shot,
         split,
         arguments,
+        cfg,
         writer=writer,
         meta_crop_shot=cfg.INPUT.META_CROP
     )
@@ -136,6 +137,7 @@ def run_test(cfg, model, distributed,phase, shot, split):
             phase = phase,
             shot = shot,
             split = split,
+            cfg = cfg
         )
         synchronize()
 

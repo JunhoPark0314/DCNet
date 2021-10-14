@@ -45,7 +45,9 @@ class GeneralizedRCNN(nn.Module):
         self.maskpool = cfg.MODEL.MASKPOOL
         self.num_classes = cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES
         if self.dense_relation:
-            self.drd_opt = DenseRelationDistill(256,32,128,self.dense_sum, cfg.MODEL.DENSE_SIGMOID, cfg.MODEL.DENSE_ZP, cfg.MODEL.DENSE_PER_LVL_BN)
+            self.drd_opt = DenseRelationDistill(256,32,128,self.dense_sum, \
+                cfg.MODEL.DENSE_SIGMOID, cfg.MODEL.DENSE_ZP, cfg.MODEL.DENSE_PER_LVL_BN, cfg.MODEL.CONCAT_BN,\
+                cfg.MODEL.ADD_ONE_MORE)
         
         self.sigmoid = nn.Sigmoid()
         self.maxpool = nn.MaxPool2d(2)
@@ -105,12 +107,15 @@ class GeneralizedRCNN(nn.Module):
         torch.cuda.empty_cache()
         if average_shot:
             attentions = self.meta_extractor(meta_input,dr=self.dense_relation)
+            attentions = F.interpolate(attentions, (26, 26))
             return attentions
         if self.training and targets is None:
             raise ValueError("In training mode, targets should be passed")
         if self.training and meta_input is not None:
             attentions = self.meta_extractor(meta_input,dr=self.dense_relation)
         if meta_attentions is not None:
+            #attentions = meta_attentions
+            meta_attentions = {k: v.normal_() * 1.75 + 0.05 for k,v in meta_attentions.items()}
             attentions = meta_attentions
 
         images = to_image_list(images)

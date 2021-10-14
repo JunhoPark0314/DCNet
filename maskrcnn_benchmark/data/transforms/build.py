@@ -45,4 +45,15 @@ def build_transforms(cfg, is_train=True):
     )
     return transform
 
-
+def build_transforms_meta(cfg):
+    min_size = cfg.INPUT.MIN_SIZE_META
+    max_size = cfg.INPUT.MAX_SIZE_META
+    flip_prob = 0.5
+    transform = T.Compose(
+        [
+            T.Resize(min_size, max_size),
+            T.RandomHorizontalFlip(flip_prob),
+            T.ToTensor(),
+        ]
+    )
+    return transform

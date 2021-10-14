@@ -77,6 +77,7 @@ def inference(
         phase=1,
         shot=10,
         split=1,
+        cfg=None,
 ):
     # convert to a torch.device for efficiency
     device = torch.device(device)
@@ -89,6 +90,8 @@ def inference(
     total_timer.tic()
     print('loading mean class attentions')
     input_dir = "saved_attentions/"
+    if cfg is not None:
+        input_dir = os.path.join(cfg.OUTPUT_DIR, input_dir)
 
     meta_attentions = pickle.load(open(os.path.join(
         input_dir, 'meta_type_{}'.format(split),

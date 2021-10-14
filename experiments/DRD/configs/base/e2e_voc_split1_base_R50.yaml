@@ -26,6 +26,7 @@ MODEL:
 DATASETS:
   TRAIN: ("voc_2007_trainval_split1_base", "voc_2012_trainval_split1_base")
   META: ("voc_meta_trainval_split1_base",)
+  #META: ("voc_meta_trainval_split2_base",)
   TEST: ("voc_2007_test_split1_base",)
 DATALOADER:
   SIZE_DIVISIBILITY: 32

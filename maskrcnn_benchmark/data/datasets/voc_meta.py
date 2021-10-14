@@ -200,12 +200,10 @@ class PascalVOCDataset_Meta(torch.utils.data.Dataset):
                     metaid.append([j,self.metalines[j][i].rstrip()])
                 self.ids.append(metaid)
 
-        if self.crop:
-
-            self.crop_transform = nn.Sequential(*[
+        if self.transforms:
+            self.transforms = nn.Sequential(*[
                 #RandomAffine(degrees=0, scale=(0.5, 1.5)),
-                ResizeWiMin(min_size=300, max_size=None),
-                NRandomCrop(size=self.img_size, n=self.crop),
+                ResizeWiMin(min_size=400, max_size=600),
                 RandomHorizontalFlip(),
             ])
 
@@ -229,17 +227,26 @@ class PascalVOCDataset_Meta(torch.utils.data.Dataset):
                 imgmask = imgmask.permute(0, 3, 1, 2).contiguous()
                 imgmask = self.crop_transform(imgmask)
             else:
-                img = cv2.resize(img, (self.img_size, self.img_size), interpolation=cv2.INTER_LINEAR)
+                if self.img_size != -1:
+                    img = cv2.resize(img, (self.img_size, self.img_size), interpolation=cv2.INTER_LINEAR)
                 #img = Image.open(img_id).convert("RGB")
                 mask, mask_info = self.get_mask(img_id, cls_id, height, width)
                 img = torch.from_numpy(img).unsqueeze(0)
                 mask = torch.from_numpy(mask).unsqueeze(0).unsqueeze(3)
                 imgmask = torch.cat([img,mask],dim=3)
-                imgmask = imgmask.permute(0, 3, 1, 2).contiguous()
 
+                if imgmask.shape[1] > imgmask.shape[2]:
+                    imgmask = imgmask.permute(0,2,1,3)
+                
+                if self.img_size == -1:
+                    imgmask = self.transforms(imgmask.permute(0, 3, 1, 2)).permute(0,2,3,1)
+                    #imgmask = self.transforms(imgmask)
+                imgmask = imgmask.permute(0, 3, 1, 2).contiguous()
+                    
             data.append(imgmask)
-            data_info.append({"mask_info":mask_info, "img_info": origin_shape})
-        res = torch.cat(data,dim=0)
+            data_info.append({"mask_info":mask_info, "img_info": imgmask.shape[2:]})
+        
+        #res = torch.cat(data,dim=0)
         res = []
         for d_i, dif_i in zip(data, data_info):
             res.append((d_i, dif_i))
@@ -263,9 +270,14 @@ class PascalVOCDataset_Meta(torch.utils.data.Dataset):
             x_ration = 1
             mask = np.zeros((height, width), dtype=np.float32)
         else:
-            y_ration = float(height) / self.img_size
-            x_ration = float(width) / self.img_size
-            mask = np.zeros((self.img_size, self.img_size), dtype=np.float32)
+            if self.img_size != -1:
+                y_ration = float(height) / self.img_size
+                x_ration = float(width) / self.img_size
+                mask = np.zeros((self.img_size, self.img_size), dtype=np.float32)
+            else:
+                y_ration = 1
+                x_ration = 1
+                mask = np.zeros((height, width), dtype=np.float32)
         mask_info = []
 
         path = img_id.split('JPEG')[0]+'Annotations/'+img_id.split('/')[-1].split('.jpg')[0]+'.xml'

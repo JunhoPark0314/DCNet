@@ -38,9 +38,10 @@ class BatchCollator(object):
             images = []
             info = [] 
             for per_img_batch in batch[0]:
-                images.append(per_img_batch[0])
+                images.append(per_img_batch[0].squeeze(0))
                 info.append(per_img_batch[1])
-            images = torch.cat(images)
+            images = to_image_list(images, self.size_divisible)
+            images = images.tensors
 
             #images = [torch.stack(image_per_level) for image_per_level in list(zip(*transposed_batch))]
             return images, info

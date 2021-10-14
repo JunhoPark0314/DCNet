@@ -1,7 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 import torch
 
-from .batch_norm import FrozenBatchNorm2d
+from .batch_norm import FrozenBatchNorm2d, SharedBatchNorm1d, SharedBatchNorm2d, SharedBatchNorm3d
 from .misc import Conv2d
 from .misc import DFConv2d
 from .misc import ConvTranspose2d
@@ -43,5 +43,8 @@ __all__ = [
     'DeformRoIPooling',
     'DeformRoIPoolingPack',
     'ModulatedDeformRoIPoolingPack',
+    'SharedBatchNorm1d',
+    'SharedBatchNorm2d',
+    'SharedBatchNorm3d',
 ]
 

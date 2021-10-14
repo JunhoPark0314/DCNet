@@ -53,6 +53,7 @@ def do_train(
     shot,
     split,
     arguments,
+    cfg,
     optimizer2=None,
     writer=None,
     meta_crop_shot=1,
@@ -97,6 +98,8 @@ def do_train(
             loss_dict, result = model(images, targets, meta_input)
             losses = sum(loss for loss in loss_dict.values())
 
+            assert losses.isfinite().item()
+
             torch.cuda.empty_cache()
             # reduce losses over all GPUs for logging purposes
             loss_dict_reduced = reduce_loss_dict(loss_dict)
@@ -111,7 +114,9 @@ def do_train(
             with amp.scale_loss(losses, optimizer) as scaled_losses:
                 torch.cuda.empty_cache()
                 scaled_losses.backward()
+
             optimizer.step()
+
             if optimizer2 is not None:
                 optimizer2.step()
 
@@ -143,7 +148,7 @@ def do_train(
                         memory=torch.cuda.max_memory_allocated() / 1024.0 / 1024.0,
                     )
                 )
-            if (iteration % 100 == 1 or iteration == max_iter) and is_main_process(): 
+            if (iteration % 200 == 1 or iteration == max_iter) and is_main_process(): 
                 visualize_episode(meta_input, meta_info, images, targets, result, writer)
             if iteration % checkpoint_period == 0:
                 checkpointer.save("model_{:07d}".format(iteration), **arguments)
@@ -151,7 +156,7 @@ def do_train(
                 checkpointer.save("model_final", **arguments)
             
         
-
+        #images = None
         with torch.no_grad():
             class_attentions = collections.defaultdict(list)
             meta_loader.batch_sampler.start_iter = 0
@@ -162,12 +167,13 @@ def do_train(
             for i in range(shot):
                 try:
                     meta_input = next(meta_iter1)[0]
+                    #if images is None:
                     images, targets, _ = next(data_iter)
                 except StopIteration:
                     meta_iter1 = iter(meta_loader)
                     meta_input = next(meta_iter1)[0]
+                    #if images is None:
                     images, targets, _ = next(data_iter)
-
 
                 images = images.to(device)
                 meta_input = meta_input.to(device)
@@ -184,7 +190,9 @@ def do_train(
                 for idx in meta_label:
                     class_attentions[idx].append(attentions[idx])
         mean_class_attentions = {k: sum(v) / len(v) for k, v in class_attentions.items()}
-        output_dir = 'saved_attentions/'
+        #mean_class_attentions = {k: mean_class_attentions[0] for k, v in class_attentions.items()}
+
+        output_dir = os.path.join(cfg.OUTPUT_DIR,'saved_attentions/')
         save_path = os.path.join(output_dir, 'meta_type_{}'.format(split))
         if not os.path.exists(save_path):
             os.makedirs(save_path)

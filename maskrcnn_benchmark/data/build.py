@@ -2,6 +2,7 @@
 import bisect
 import copy
 import logging
+from maskrcnn_benchmark.data.transforms.build import build_transforms_meta
 
 import torch.utils.data
 from maskrcnn_benchmark.utils.comm import get_world_size
@@ -47,6 +48,7 @@ def build_dataset(dataset_list, transforms, dataset_catalog, is_train=True, shot
             args["size"] = size
             args["seed"] = seed
             args["crop"] = crop
+            args["transforms"] = transforms
         if data["factory"] == "COCODataset_Meta":
             args["transforms"] = None
             args["shots"] = shots
@@ -167,6 +169,8 @@ def make_data_loader(cfg, is_train=True, is_distributed=False, start_iter=0, met
         images_per_gpu = 1
     # If bbox aug is enabled in testing, simply set transforms to None and we will apply transforms later
     transforms = None if not is_train and cfg.TEST.BBOX_AUG.ENABLED else build_transforms(cfg, is_train)
+    if meta == True:
+        transforms = build_transforms_meta(cfg)
     shots = cfg.INPUT.SHOTS
     size = cfg.INPUT.META_SIZE
     seed = cfg.MODEL.SEED

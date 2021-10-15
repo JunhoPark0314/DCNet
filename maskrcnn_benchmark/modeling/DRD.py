@@ -7,7 +7,7 @@ from maskrcnn_benchmark.utils.events import get_event_storage
  
 class DenseRelationDistill(nn.Module):
 
-    def __init__(self, indim, keydim, valdim, dense_sum=False, sigmoid_attn=False, no_padding=False, per_level_bn=False, normalize_concat=False, add_one_more=True):
+    def __init__(self, indim, keydim, valdim, dense_sum=False, sigmoid_attn=False, no_padding=False, per_level_bn=False, normalize_concat=False, class_wise_p=False):
         super(DenseRelationDistill,self).__init__()
         #self.key_q = nn.Conv2d(indim, keydim, kernel_size=(3,3), padding=(1,1), stride=1)
         #self.value_q = nn.Conv2d(indim, valdim, kernel_size=(3,3), padding=(1,1), stride=1)
@@ -25,7 +25,7 @@ class DenseRelationDistill(nn.Module):
         self.sum = dense_sum
         self.sigmoid_attn = sigmoid_attn
         self.normalize_concat = normalize_concat
-        self.add_one_more = add_one_more
+        self.class_wise_p = class_wise_p
         if self.sum:
             self.key_q0 = nn.Conv2d(indim, keydim, kernel_size=(3,3), padding=padding, stride=1)
             self.value_q0 = nn.Conv2d(indim, valdim, kernel_size=(3,3), padding=padding, stride=1)
@@ -74,11 +74,13 @@ class DenseRelationDistill(nn.Module):
         else:
             features = list(features)
         """
+        """
         storage = get_event_storage()
         if storage.iter % 10 == 0:
             for i,f in enumerate(features):
                 print('f{}'.format(i), torch.std_mean(f))
             print('a',torch.std_mean(attentions))
+        """
 
         features = list(features)
         if isinstance(attentions,dict):
@@ -106,7 +108,7 @@ class DenseRelationDistill(nn.Module):
             key_q = eval('self.key_q'+str(idx))(feature) 
             val_q = eval('self.value_q'+str(idx))(feature)   
             if self.normalize_concat:
-                val_q = self.val_bnn(val_q, share_id=0) / len(key_t)
+                val_q = self.val_bnn(val_q, share_id=0) / ncls
                 key_q = self.key_bnn(key_q, share_id=0)
             key_q = key_q.view(bs,32,-1)
 
@@ -124,6 +126,8 @@ class DenseRelationDistill(nn.Module):
                     temperature = 2
                 if self.sigmoid_attn:
                     p = (self.attn_bnn(idx)(p) / temperature).sigmoid()
+                elif self.class_wise_p:
+                    p = F.softmax(p.flatten(0,1) / temperature , dim=0).view(ncls, -1, att_h * att_w) * ncls
                 else:
                     p = F.softmax(p / temperature,dim=1)
                 
@@ -150,12 +154,11 @@ class DenseRelationDistill(nn.Module):
           
             output.append(final_1)
         
-        if self.add_one_more:
-            if self.sum:
-                for i in range(len(output)):
-                    if self.normalize_concat:
-                        features[i] = self.level_bnn(features[i])
-                    output[i] = self.combine(torch.cat((features[i],output[i]),dim=1))
+        if self.sum:
+            for i in range(len(output)):
+                if self.normalize_concat:
+                    features[i] = self.level_bnn(features[i])
+                output[i] = self.combine(torch.cat((features[i],output[i]),dim=1))
         output = tuple(output)
         
         return output, full_attention

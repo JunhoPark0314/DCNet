@@ -47,7 +47,7 @@ class GeneralizedRCNN(nn.Module):
         if self.dense_relation:
             self.drd_opt = DenseRelationDistill(256,32,128,self.dense_sum, \
                 cfg.MODEL.DENSE_SIGMOID, cfg.MODEL.DENSE_ZP, cfg.MODEL.DENSE_PER_LVL_BN, cfg.MODEL.CONCAT_BN,\
-                cfg.MODEL.ADD_ONE_MORE)
+                cfg.MODEL.CLASS_WISE_P)
         
         self.sigmoid = nn.Sigmoid()
         self.maxpool = nn.MaxPool2d(2)
